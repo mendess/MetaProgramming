@@ -50,15 +50,22 @@ function handler_bind(func, handlers...)
                 break
             end
         end
+        println("EX ", e)
         throw(e)
     end
 end
 
-restarts = Dict()
+RESTARTS_MAP = Dict{Symbol,Function}()
 
 function restart_bind(restartable, restarts...)
-    for r in restarts
-        restarts[r.first] = r.second
+    global RESTARTS_MAP
+    for r in RESTARTS_MAP
+        println(r)
+        println(r.first)
+        println(r.second)
+        fst::Symbol = r.first
+        snd::Function = r.second
+        restarts[fst] = snd
     end
     return restartable()
 end
