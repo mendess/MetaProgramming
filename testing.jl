@@ -49,7 +49,7 @@ function handler_bind(func, handlers...)
         for pair in handlers
             if isa(e, pair.first)
                 try
-                    pair.second(pair.first)
+                    return pair.second(pair.first)
                 catch e
                     if isa(e, RestartResult)
                         return e.result
@@ -57,7 +57,6 @@ function handler_bind(func, handlers...)
                         throw(e)
                     end
                 end
-                break
             end
         end
         throw(e)
