@@ -50,7 +50,6 @@ function handler_bind(func, handlers...)
                 break
             end
         end
-        println("EX ", e)
         throw(e)
     end
 end
@@ -60,18 +59,14 @@ RESTARTS_MAP = Dict{Symbol,Function}()
 function restart_bind(restartable, restarts...)
     global RESTARTS_MAP
     for r in RESTARTS_MAP
-        println(r)
-        println(r.first)
-        println(r.second)
-        fst::Symbol = r.first
-        snd::Function = r.second
         restarts[fst] = snd
     end
     return restartable()
 end
 
 function invoke_restart(restart, args...)
-    restarts[restart](args)
+    println(RESTARTS_MAP)
+    RESTARTS_MAP[restart](args)
 end
 
 a = block() do escape
@@ -103,7 +98,7 @@ reciprocal(v) =
     restart_bind(:return_zero => () -> 0,
                  :return_value => identity,
                  :retry_using => reciprocal) do
-    value == 0 ? throw(DivisionByZero()) : 1 / value
+    v == 0 ? throw(DivisionByZero()) : 1 / v
 end
 
 a = handler_bind(DivisionByZero => (c) -> invoke_restart(:return_zero)) do
