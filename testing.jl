@@ -1,10 +1,7 @@
 struct DivisionByZero <: Exception end
 
-function reciprocal(x)
-    x == 0 ?
-    error(DivisionByZero()) :
-    1 / x
-end
+reciprocal(x) = x == 0 ? throw(DivisionByZero()) : 1 / x
+reciprocale(x) = x == 0 ? error(DivisionByZero()) : 1 / x
 
 mystery(n) =
     1 +
@@ -22,13 +19,8 @@ mystery(n) =
         end
     end
 
-
-
-
 #####################################
 counter = 0
-
-
 function block(func)
     global counter
     flag = counter
@@ -36,45 +28,78 @@ function block(func)
     try
         func(flag)
     catch e
-        print(e[1])
         if e[1] == flag
             return e[2]
         else
+            throw(e)
         end
     end
 end
 
-
 function return_from(name, value=nothing)
     throw((name, value));
-end
-
-mystery(0)
-
-try
-    reciprocal(0)
-catch e
-    e
 end
 
 function handler_bind(func, handlers...)
     try
         func()
     catch e
-        println("catch")
         for pair in handlers
-            println(typeof(e))
-            println(pair.first)
-            println(pair.second)
-            if typeof(e) == pair.first
-                yield(pair.second)
+            if isa(e, pair.first)
+                pair.second(pair.first)
+                break
             end
         end
+        throw(e)
     end
-    println("ups")
 end
-#=
-handler_bind(()->reciprocal(0),
-DivisionByZero =>
-(c)->println("I saw a division by zero")) =#
-print(reciprocal(0))
+
+restarts = Dict()
+
+function restart_bind(restartable, restarts...)
+    for r in restarts
+        restarts[r.first] = r.second
+    end
+    return restartable()
+end
+
+function invoke_restart(restart, args...)
+    restarts[restart](args)
+end
+
+a = block() do escape
+    handler_bind(DivisionByZero => (c) -> (println("I saw it too"); return_from(escape, "Done"))) do
+        handler_bind(DivisionByZero => (c) -> println("I saw a division by zero")) do
+            reciprocal(0)
+        end
+    end
+end
+println(a)
+a = block() do escape
+    handler_bind(DivisionByZero => (c) -> println("I saw a division by zero")) do
+        handler_bind(DivisionByZero => (c) -> (println("I saw it too"); return_from(escape, "Done"))) do
+            reciprocal(0)
+        end
+    end
+end
+
+block() do escape
+    handler_bind(ErrorException => function(c)
+                     println("Lol rekt ", c)
+                     return_from(escape, "got him")
+                 end) do
+       reciprocale(0)
+    end
+end
+
+reciprocal(v) =
+    restart_bind(:return_zero => () -> 0,
+                 :return_value => identity,
+                 :retry_using => reciprocal) do
+    value == 0 ? throw(DivisionByZero()) : 1 / value
+end
+
+a = handler_bind(DivisionByZero => (c) -> invoke_restart(:return_zero)) do
+    reciprocal(0)
+end
+println(a)

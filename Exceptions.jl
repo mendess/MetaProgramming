@@ -1,4 +1,4 @@
-#= 
+#=
 function block(func)
 end
 
@@ -18,7 +18,7 @@ function error(exception::Exception)
 end =#
 
 function handler_bind(func, handlers...)
-    try 
+    try
         func()
     catch e
         println("catch" + e)
@@ -27,7 +27,9 @@ function handler_bind(func, handlers...)
                 return pair.second
             end
         end
+        throw(e)
     end
 
     println("ups")
 end
+
