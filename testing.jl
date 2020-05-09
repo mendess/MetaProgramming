@@ -5,7 +5,7 @@ import .Exceptional.*
 struct DivisionByZero <: Exception end
 
 reciprocal(x) = x == 0 ? throw(DivisionByZero()) : 1 / x
-reciprocale(x) = x == 0 ? error(DivisionByZero()) : 1 / x
+#reciprocale(x) = x == 0 ? error(DivisionByZero()) : 1 / x
 
 mystery(n) =
     1 + block() do outer

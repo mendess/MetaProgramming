@@ -7,15 +7,18 @@ struct RestartResult <: Exception
 end
 
 COUNTER = 0
+
+RESTARTS_MAP = Dict{Symbol,Function}()
+
 function block(func)
     global COUNTER
     flag = COUNTER
-    counter =  COUNTER + 1
+    COUNTER += 1
     try
         func(flag)
     catch e
-        if e[1] == flag
-            return e[2]
+        if e.first == flag
+            e.second
         else
             throw(e)
         end
@@ -23,17 +26,17 @@ function block(func)
 end
 
 function return_from(name, value=nothing)
-    throw((name, value));
+    throw(name => value);
 end
 
 function handler_bind(func, handlers...)
     try
-        return func()
+        func()
     catch e
         for pair in handlers
             if isa(e, pair.first)
                 try
-                    return pair.second(pair.first)
+                    pair.second(pair.first)
                 catch e
                     if isa(e, RestartResult)
                         return e.result
@@ -41,20 +44,19 @@ function handler_bind(func, handlers...)
                         throw(e)
                     end
                 end
+                break
             end
         end
         throw(e)
     end
 end
 
-RESTARTS_MAP = Dict{Symbol,Function}()
-
 function restart_bind(restartable, restarts...)
     global RESTARTS_MAP
     for r in restarts
         RESTARTS_MAP[r.first] = r.second
     end
-    return restartable()
+    restartable()
 end
 
 function invoke_restart(restart, args...)
@@ -66,4 +68,6 @@ function available_restart(restart)
     global RESTARTS_MAP
     haskey(RESTARTS_MAP, restart)
 end
+
 end
+
