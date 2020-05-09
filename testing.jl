@@ -58,14 +58,14 @@ RESTARTS_MAP = Dict{Symbol,Function}()
 
 function restart_bind(restartable, restarts...)
     global RESTARTS_MAP
-    for r in RESTARTS_MAP
-        restarts[fst] = snd
+    for r in restarts
+        RESTARTS_MAP[r.first] = r.second
     end
     return restartable()
 end
 
 function invoke_restart(restart, args...)
-    println(RESTARTS_MAP)
+    global RESTARTS_MAP
     RESTARTS_MAP[restart](args)
 end
 
