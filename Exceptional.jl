@@ -1,14 +1,40 @@
 module Exceptional
+include("Stack.jl")
+using .stack
+import .stack.*
 
-export block, return_from, available_restart, invoke_restart, restart_bind, handler_bind
+export error, block, return_from, available_restart, invoke_restart, restart_bind, handler_bind
 
-struct RestartResult <: Exception
-    result
+struct RestartResult{T} <: Exception
+    result::T
 end
 
-COUNTER = 0
+struct RestartNotFound <: Exception end
 
-RESTARTS_MAP = Dict{Symbol,Function}()
+global COUNTER = 0
+
+global RESTARTS_STACK = Stack{Dict{Symbol,Function}}()
+
+global HANDLER_STACK = Stack{Vector{Pair{DataType, Function}}}()
+
+function error(e)
+    while (hs = pop!(HANDLER_STACK)) != nothing
+        for h in hs
+            if e isa h.first
+                try
+                    h.second(h.first)
+                catch e
+                    if e isa RestartResult
+                        return e.result
+                    else
+                        throw(e)
+                    end
+                end
+            end
+        end
+    end
+    throw(e)
+end
 
 function block(func)
     global COUNTER
@@ -30,43 +56,43 @@ function return_from(name, value=nothing)
 end
 
 function handler_bind(func, handlers...)
-    try
-        func()
-    catch e
-        for pair in handlers
-            if isa(e, pair.first)
-                try
-                    pair.second(pair.first)
-                catch e
-                    if isa(e, RestartResult)
-                        return e.result
-                    else
-                        throw(e)
-                    end
-                end
-                break
-            end
-        end
-        throw(e)
-    end
+    a::Vector{Pair{DataType, Function}} = collect(handlers)
+    push!(HANDLER_STACK, a)
+    func()
 end
 
 function restart_bind(restartable, restarts...)
-    global RESTARTS_MAP
+    restarts_map = Dict{Symbol,Function}()
     for r in restarts
-        RESTARTS_MAP[r.first] = r.second
+        restarts_map[r.first] = r.second
     end
+    global RESTARTS_STACK
+    push!(RESTARTS_STACK, restarts_map)
     restartable()
 end
 
 function invoke_restart(restart, args...)
-    global RESTARTS_MAP
-    throw(RestartResult(RESTARTS_MAP[restart](args...)))
+    global RESTARTS_STACK
+    while (map = pop!(RESTARTS_STACK)) != nothing
+        if haskey(map, restart)
+            throw(RestartResult(map[restart](args...)))
+        end
+    end
+    throw(RestartNotFound)
 end
 
 function available_restart(restart)
-    global RESTARTS_MAP
-    haskey(RESTARTS_MAP, restart)
+    global RESTARTS_STACK
+    if length(RESTARTS_STACK) < 1
+        false
+    else
+        for map in RESTARTS_STACK
+            if haskey(map, restart)
+               return  true
+            end
+        end
+        false
+    end
 end
 
 end
