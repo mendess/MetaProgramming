@@ -3,11 +3,15 @@ include("Stack.jl")
 using .stack
 import .stack.*
 
-export error, block, return_from, available_restart, invoke_restart, restart_bind, handler_bind
+export error,
+       block,
+       return_from,
+       available_restart,
+       invoke_restart,
+       restart_bind,
+       handler_bind
 
-struct RestartResult{T} <: Exception
-    result::T
-end
+struct RestartResult{T} <: Exception result::T end
 
 struct RestartNotFound <: Exception end
 
@@ -62,17 +66,11 @@ function handler_bind(func, handlers...)
 end
 
 function restart_bind(restartable, restarts...)
-    restarts_map = Dict{Symbol,Function}()
-    for r in restarts
-        restarts_map[r.first] = r.second
-    end
-    global RESTARTS_STACK
-    push!(RESTARTS_STACK, restarts_map)
+    push!(RESTARTS_STACK, Dict{Symbol,Function}(restarts...))
     restartable()
 end
 
 function invoke_restart(restart, args...)
-    global RESTARTS_STACK
     while (map = pop!(RESTARTS_STACK)) != nothing
         if haskey(map, restart)
             throw(RestartResult(map[restart](args...)))
@@ -82,7 +80,6 @@ function invoke_restart(restart, args...)
 end
 
 function available_restart(restart)
-    global RESTARTS_STACK
     f(map) = haskey(map, restart)
     for _ in Iterators.filter(f, RESTARTS_STACK)
         return true
