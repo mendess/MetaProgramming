@@ -83,16 +83,11 @@ end
 
 function available_restart(restart)
     global RESTARTS_STACK
-    if length(RESTARTS_STACK) < 1
-        false
-    else
-        for map in RESTARTS_STACK
-            if haskey(map, restart)
-               return  true
-            end
-        end
-        false
+    f(map) = haskey(map, restart)
+    for _ in Iterators.filter(f, RESTARTS_STACK)
+        return true
     end
+    return false
 end
 
 end
