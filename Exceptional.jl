@@ -31,7 +31,7 @@ function error(e)
                     if e isa RestartResult
                         return e.result
                     else
-                        throw(e)
+                        rethrow(e)
                     end
                 end
             end
@@ -50,7 +50,7 @@ function block(func)
         if e.first == flag
             e.second
         else
-            throw(e)
+            rethrow(e)
         end
     end
 end
@@ -88,4 +88,3 @@ function available_restart(restart)
 end
 
 end
-
