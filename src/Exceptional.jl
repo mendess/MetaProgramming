@@ -1,7 +1,4 @@
 module Exceptional
-include("Stack.jl")
-using .stack
-import .stack.*
 
 export error,
        block,
@@ -10,6 +7,12 @@ export error,
        invoke_restart,
        restart_bind,
        handler_bind
+export ExceptionalExtended
+
+include("Stack.jl")
+
+using .stack
+import .stack.*
 
 struct RestartResult{T} <: Exception result::T end
 
@@ -87,4 +90,5 @@ function available_restart(restart)
     return false
 end
 
+include("ExceptionalExtended.jl")
 end

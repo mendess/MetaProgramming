@@ -1,4 +1,4 @@
-include("Exceptional.jl")
+include("../src/Exceptional.jl")
 using .Exceptional
 import .Exceptional.*
 using Test
@@ -164,3 +164,24 @@ struct Lmao <: Exception end
         outer2()
     end
 end
+
+@testset "signal" begin
+    sentinel = 0
+    @test_throws ErrorException handler_bind(
+            DivisionByZero => (c) -> ExceptionalExtended.signal("lmao")) do
+        reciprocal(0)
+        sentinel += 1
+    end
+    @test sentinel == 0
+    sentinel = 0
+    @test_throws ErrorException handler_bind(DivisionByZero => (c) -> sentinel += 1) do
+        handler_bind(DivisionByZero => (c) -> ExceptionalExtended.signal("kek")) do
+            reciprocal(0)
+        end
+    end
+    @test sentinel == 0
+end
+
+#= @test 0 == handler_bind(DivisionByZero => (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do =#
+#=     reciprocal_restart(0) =#
+#= end =#
