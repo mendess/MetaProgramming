@@ -17,7 +17,7 @@
 
 \documentclass{beamer}
 
-\mode<presentation> {
+\mode<presentation> {%
 
 % The Beamer class comes with a number of default slide themes
 % which change the colors and layouts of slides. Below this is a list
@@ -78,6 +78,8 @@
 
 \usepackage{graphicx} % Allows including images
 \usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+\usepackage{minted}
+\usepackage{hyperref}
 
 %----------------------------------------------------------------------------------------
 %	TITLE PAGE
@@ -87,7 +89,7 @@
 
 \author{Pedro Mendes, Ricardo Pereira} % Your name
 \institute[IST] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
-{
+{%
 Instituto Superior Técnico \\ % Your institution for the title page
 \medskip
 
@@ -97,7 +99,7 @@ Instituto Superior Técnico \\ % Your institution for the title page
 \begin{document}
 
 \begin{frame}
-\titlepage % Print the title page as the first slide
+\titlepage% Print the title page as the first slide
 \end{frame}
 
 \begin{frame}
@@ -109,22 +111,25 @@ Instituto Superior Técnico \\ % Your institution for the title page
 %	PRESENTATION SLIDES
 %----------------------------------------------------------------------------------------
 
-\section{block \& return\_from}
+\section{\texttt{block} \& \texttt{return\_from}}
 \begin{frame}
-\frametitle{Functions block \& return\_from }
+\frametitle{Functions \texttt{block} \& \texttt{return\_from} }
 
 \begin{block}{}
-These two functions were implemented using the try-catch mechanism present in Julia
+These two functions were implemented using the try-catch mechanism present in Julia.
 \end{block}
 
-\begin{block}{block function}
-The block function uses a global counter to generate the "token" that will be assigned
-to the block, and then used by the return\_from function
+\begin{block}{\texttt{block}}
+To distinguish different blocks we decided to attribute a unique id to each block, to achieve this
+the \texttt{block} function uses a global counter to generate the token that will be assigned
+to the block, and then used by the \texttt{return\_from} function.
+If the block function catches an exception that is not of type \texttt{ReturnFrom}, it simply rethrows it
+so it doesn't intervene in the rest of the program's control flow.
 \end{block}
 
-\begin{block}{return\_from}
-The return\_from function throws a ReturnFrom exception containing the token
-and the return value to return in the block
+\begin{block}{\texttt{return\_from}}
+The \texttt{return\_from} function then throws a known exception called \texttt{ReturnFrom} containing
+the token and the return value to return in the block.
 \end{block}
 
 \end{frame}
@@ -133,146 +138,362 @@ and the return value to return in the block
 
 %------------------------------------------------
 
-\section{handler\_bind}
+\section{\texttt{handler\_bind}}
 \begin{frame}
-\frametitle{handler\_bind}
-\begin{itemize}
-\item Lorem ipsum dolor sit amet, consectetur adipiscing elit
-\item Aliquam blandit faucibus nisi, sit amet dapibus enim tempus eu
-\item Nulla commodo, erat quis gravida posuere, elit lacus lobortis est, quis porttitor odio mauris at libero
-\item Nam cursus est eget velit posuere pellentesque
-\item Vestibulum faucibus velit a augue condimentum quis convallis nulla gravida
-\end{itemize}
+\frametitle{\texttt{handler\_bind}}
+
+\begin{block}{Handler Stack}
+To make the handler bind work, we used a global handler stack. This stack has a Vector of handlers, each
+of them belonging to a separate \texttt{handler\_bind} call.
+
+Using a stack of vectors instead of a flat vector of handlers allows us to nest \texttt{handler\_bind} calls
+and still distinguish to which call the handler belongs to.
+\end{block}
+
+\begin{block}{\texttt{handler\_bind}}
+This function then simply pushes its passed handlers to the stack and calls
+the wrapped function normally.
+\end{block}
+
+\end{frame}
+
+\subsection{\texttt{error} function}
+\begin{frame}[fragile]{The \texttt{error} function when combined with \texttt{handler\_bind}}
+\begin{alertblock}{Important Note}
+The error function is the function that makes the whole architecture tick.
+As such we will be returning to it latter in the presentation.
+\end{alertblock}
+\begin{block}{}
+To make the \texttt{handler\_bind} work, the error function tries to find a suitable handler in the
+Handler Stack, for each set of handler it tries to call all that match the type of the passed error.
+
+Throwing in a handler will result in no more handlers being called as this counts as a
+\textit{non-local transfer of control}. As such a simple implementation of it would look like this.
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{error} example}
+\begin{minted}{julia}
+function error(err)
+    while (hs = peek(HANDLER_STACK)) != nothing
+        for h in filter(h -> err isa h.first, hs)
+            h.second(err)
+        end
+        pop!(HANDLER_STACK)
+    end
+    throw(err)
+end
+\end{minted}
+\end{frame}
+%------------------------------------------------
+
+\section{\texttt{restart\_bind}}
+\begin{frame}
+\frametitle{\texttt{restart\_bind}}
+
+\begin{block}{\texttt{restart\_bind}}
+\texttt{restart\_bind} is very similar to \texttt{handler\_bind}, all it does is collect
+the restarts it receives and stores them in a stack (a separate one from the one used by \texttt{handler\_bind}), so
+that they can be referenced later. After doing so it simply calls the wrapped function.
+\end{block}
+
+\begin{block}{Restart Stack}
+We use a stack here for the same reason we used on for the handlers, this way we can pop the restarts in logical blocks
+so, this also allows nesting of restarts with the same name.
+\end{block}
+
+
 \end{frame}
 
 %------------------------------------------------
 
-\section{restart\_bind}
+\section{\texttt{invoke\_restart}}
+
 \begin{frame}
-\frametitle{restart\_bind}
-\begin{block}{Block 1}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ultricies in feugiat rutrum, porttitor sit amet augue. Aliquam ut tortor mauris. Sed volutpat ante purus, quis accumsan dolor.
+\frametitle{\texttt{invoke\_restart}}
+
+\begin{block}{\texttt{invoke\_restart}}
+Invoke restart is designed to works a possible handler of handler bind. If it is called outside this context
+it's behaviour is undefined.
+
+Given this constraint we know that handlers are only called by the error function, which means that all calls
+made to this function are done indirectly by \texttt{error}.
+\end{block}
+\begin{block}{Finding a restart}
+This function will then pop restarts from the restart stack until it finds one that matches the given
+name, when it does, it calls the restart and throws another known exception called \texttt{RestartResult}
+that contains the return value of the called restart. This exception is then caught by \texttt{error} which
+will halt the handler lookup to return the value wrapped in the \texttt{RestartResult}
 \end{block}
 
-\begin{block}{Block 2}
-Pellentesque sed tellus purus. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Vestibulum quis magna at risus dictum tempor eu vitae velit.
-\end{block}
 
-\begin{block}{Block 3}
-Suspendisse tincidunt sagittis gravida. Curabitur condimentum, enim sed venenatis rutrum, ipsum neque consectetur orci, sed blandit justo nisi ac lacus.
+\end{frame}
+\subsection{\texttt{error} function}
+\begin{frame}{The new \texttt{error} function}
+\begin{block}{Changes to the \texttt{error} function}
+The \texttt{error} function had to be changed to accommodate for this feature, a try catch was added
+to check if the handler threw a \texttt{RestartResult} and handle it accordingly as explained before.
 \end{block}
 \end{frame}
-
-%------------------------------------------------
-
-\section{invoke\_restart}
-
-\begin{frame}
-\frametitle{invoke\_restart}
-\begin{columns}[c] % The "c" option specifies centered vertical alignment while the "t" option is used for top vertical alignment
-
-\column{.45\textwidth} % Left column and width
-\textbf{Heading}
-\begin{enumerate}
-\item Statement
-\item Explanation
-\item Example
-\end{enumerate}
-
-\column{.5\textwidth} % Right column and width
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ultricies in feugiat rutrum, porttitor sit amet augue. Aliquam ut tortor mauris. Sed volutpat ante purus, quis accumsan dolor.
-
-\end{columns}
+\begin{frame}[fragile]{\texttt{error} example}
+\begin{minted}[fontsize=\small]{julia}
+function error(err)
+  while (hs = peek(HANDLER_STACK)) != nothing
+    for h in filter(h -> err isa h.first, hs)
+      try
+        h.second(err)
+      catch e # added
+        # if the handler `h.second` invoked a restart
+        if e isa RestartResult
+          return e.result # return it
+        else
+          # otherwise maintain the behavior that throwing is a
+          # non-local transfer of control
+          rethrow(e)
+    end; end; end
+    pop!(HANDLER_STACK)
+  end
+  throw(err)
+end
+\end{minted}
 \end{frame}
 
 %------------------------------------------------
 
 \section{Extensions}
-\subsection{signal}
+\subsection{\texttt{signal}}
 
 \begin{frame}
-\frametitle{Table}
-\begin{table}
-\begin{tabular}{l l l}
-\toprule
-\textbf{Treatments} & \textbf{Response 1} & \textbf{Response 2}\\
-\midrule
-Treatment 1 & 0.0003262 & 0.562 \\
-Treatment 2 & 0.0015681 & 0.910 \\
-Treatment 3 & 0.0009271 & 0.296 \\
-\bottomrule
-\end{tabular}
-\caption{Table caption}
-\end{table}
+\frametitle{\texttt{signal}}
+
+\begin{block}{}
+The signal function simply makes use of the \texttt{Base.error} function
+to abort the program no matter what is happening, throwing an \texttt{ErrorException}.
+\end{block}
 \end{frame}
 
 %------------------------------------------------
 
-\subsection{interactive}
-\begin{frame}
-\frametitle{Theorem}
-\begin{theorem}[Mass--energy equivalence]
-$E = mc^2$
-\end{theorem}
+\subsection{Interactive restarts}
+\begin{frame}[fragile]
+\frametitle{Interactive restarts}
+\begin{block}{\texttt{invoke\_restart\_interactive}}
+This function can be used anywhere a normal \texttt{invoke\_restart} function can be used. It then will, when called,
+interrupt the program to provide an interactive prompt for the user to pick a restart or cancel to return
+without invoking any restarts.
+\end{block}
+\begin{example}
+Given this function,
+\begin{minted}{julia}
+reciprocal_restart(v) =
+    restart_bind(:return_zero => () -> 0,
+                 :return_value => identity,
+                 :retry_using => (f) -> f()) do
+    reciprocal(0)
+end
+\end{minted}
+if an interactive restart is used a prompt like this will show up:
+\end{example}
 \end{frame}
 
-%------------------------------------------------
+\begin{frame}[fragile]{Interactive restarts}
+\begin{example}
+\begin{minted}[fontsize=\small]{text}
+Choose a restart:
+0: cancel :: !
+1: return_zero :: Any
+2: retry_using :: Any
+3: return_value :: Any
+restart>
+\end{minted}
+\end{example}
+\begin{example}
+If there were other restarts in previous functions they can also be called here
+and are distinguished by their level on indentation.
+\begin{minted}[fontsize=\small]{text}
+Choose a restart:
+0: cancel :: !
+1: return_zero :: Any
+  2: just_do_it :: Any
+restart>
+\end{minted}
+\end{example}
 
-\subsection{handler\_case}
+\end{frame}
 
-\begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
-\frametitle{Verbatim}
-\begin{example}[Theorem Slide Code]
+\begin{frame}[fragile]{Parameterized restarts}\label{f:param_restart}
+
+\begin{block}{}
+Some restarts require parameters to be passed. Because julia doesn't let you reflect on the types of
+lambdas at runtime the programmer needs to supply the parameters by hand. For the example above this will look
+like so
+\end{block}
+\begin{example}
+\begin{minted}{julia}
+reciprocal_restart(v) =
+  restart_bind(:r_zero => () -> 0,
+               :r_value => identity => (Float64,),
+               :r_using => ((f) -> f()) => (Function,)) do
+  reciprocal(0)
+end
+\end{minted}
+\end{example}
+\end{frame}
+
+\begin{frame}[fragile]{Parameterized restarts}
+\begin{example}
 \begin{verbatim}
-\begin{frame}
-\frametitle{Theorem}
-\begin{theorem}[Mass--energy equivalence]
-$E = mc^2$
-\end{theorem}
-\end{frame}\end{verbatim}
+0: cancel :: !
+1: return_zero :: Any
+2: retry_using :: Function -> Any
+3: return_value :: Float64 -> Any
+restart> 3
+Input Float64: 4.2
+\end{verbatim}
+\end{example}
+\begin{example}
+\begin{verbatim}
+Choose a restart:
+0: cancel :: !
+1: return_zero :: Any
+2: retry_using :: Function -> Any
+3: return_value :: Float64 -> Any
+restart> 2
+Input Function: () -> 8.4 / 2
+\end{verbatim}
+\end{example}
+\end{frame}
+%------------------------------------------------
+\subsection{\texttt{@handler\_case}}
+\begin{frame}[fragile]
+\frametitle{\texttt{@handler\_case}}
+
+\begin{block}{Abbreviating common idioms}
+This macro is a shortcut for combining \texttt{block}, \texttt{return\_from} and
+\texttt{handler\_bind}.
+\end{block}
+\begin{example}
+Instead of writing
+\begin{minted}[fontsize=\small]{julia}
+block() do token
+  handler_bind(Except => (c) -> return_from(token, some_val)) do
+    some_function()
+  end
+end
+\end{minted}
+One can simply write
+\begin{minted}{julia}
+@handler_case some_function() begin
+    c::Except = some_val
+end
+\end{minted}
+\end{example}
+
+\end{frame}
+\begin{frame}[fragile]{Nesting}
+\begin{example}
+It can also be nested in arbitrary ways without causing conflicts.
+\begin{minted}{julia}
+@handler_case e() begin
+    c::Except1 = 1
+    c::Except2 = @handler_case e() begin
+            d::Except1 = c.n
+            d::Except2 = d.n * 2
+        end
+end
+\end{minted}
+And even a default exception can be used much like the language's try catch expression can.
+
+\begin{minted}{julia}
+@handler_case e() begin
+    c = 1
+end
+\end{minted}
 \end{example}
 \end{frame}
 
 %------------------------------------------------
-
-\subsection{restart\_case}
-
-\begin{frame}
-\frametitle{Figure}
-Uncomment the code on this slide to include your own image from the same directory as the template .TeX file.
-%\begin{figure}
-%\includegraphics[width=0.8\linewidth]{test}
-%\end{figure}
+\subsection{\texttt{@fn\_types}}
+\begin{frame}[fragile]{\texttt{@fn\_types}}
+   \begin{block}{}
+   To make this process more pleasant a new \texttt{@fn\_types} macro was implemented.
+   It can be applied to lambdas whose type arguments are explicitly typed and it will generate the type tuple
+   for the user.
+   \end{block}
+   \begin{example}
+   This code is equivalent to the example in Slide~\ref{f:param_restart}.
+   \begin{minted}{julia}
+reciprocal_macro(v) = restart_bind(
+        :return_zero => () -> 0,
+        :return_value => (@fn_types (c::Float64) -> c),
+        :retry_using => @fn_types (f::Function) -> f()) do
+    reciprocal(0)
+end
+   \end{minted}
+   \end{example}
 \end{frame}
-
 %------------------------------------------------
 
-\begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
-\frametitle{Citation}
-An example of the \verb|\cite| command to cite within the presentation:\\~
+\subsection{\texttt{@restart\_case}}
 
-This statement requires citation \cite{p1}.
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{References}
-\footnotesize{
-\begin{thebibliography}{99} % Beamer does not support BibTeX so references must be inserted manually as below
-\bibitem[Smith, 2012]{p1} John Smith (2012)
-\newblock Title of the publication
-\newblock \emph{Journal Name} 12(3), 45 -- 678.
-\end{thebibliography}
-}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\Huge{\centerline{The End}}
+\begin{frame}[fragile]
+\frametitle{\texttt{@restart\_case}}
+\begin{block}{}
+This is a convenience macro for defining restart cases.
+Instead of writing
+\begin{minted}[fontsize=\small]{julia}
+some_restartable(v) =
+restart_bind(:return_zero => () -> 0,
+             :return_value => ((c) -> c) => (Float64,),
+             :retry_using => ((f) -> f()) => (Function,)) do
+    some_function(v)
+end
+\end{minted}
+One can simply write
+\begin{minted}[fontsize=\small]{julia}
+some_restartable(v) = @restart_case some_function(b) begin
+    :return_zero => () -> 0
+    :return_value => (c::Float64) -> c
+    :retry_using => (f::Function) -> f()
+end
+\end{minted}
+This macro will also make sure to include the types of the lambdas when they are typed
+so that \texttt{invoke\_restart\_interactive} can then ask for the parameters for
+parsing.
+\end{block}
 \end{frame}
 
 %----------------------------------------------------------------------------------------
+\section{Extra remarks}
+\begin{frame}[fragile]{Pattern matching}
+\begin{block}{\texttt{@match} macro}
+During the development of the project lots of if/else-if/else chains where used theses were
+very verbose but Julia does not have a builtin switch/case or pattern match mechanism.
 
-\end{document} 
+To compensate for this a simple \texttt{@match} macro was written to alleviate this pain point.
+\end{block}
+\begin{example}
+\begin{minted}{julia}
+@match parse(Int, some_string) begin
+    0   => println("Got a 0")
+    1   => println("Got a 1")
+    2:6 => println("Got a number between 2 and 6")
+    _   => println("Got something else: \$_")
+end
+\end{minted}
+\end{example}
+\end{frame}
+\begin{frame}{Pattern matching}
+\begin{block}{}
+This macro supports matching:
+\begin{itemize}
+    \item on constants;
+    \item on ranges of values
+    \item default cases (using the \_ character)
+\end{itemize}
+It was heavily inspired by the macro implemented by \href{https://github.com/kmsquire}{kmsquire} and
+\href{https://github.com/kmsquire/Match.jl}{\textit{hosted on github}}.
+\end{block}
+\end{frame}
+
+\end{document}
