@@ -38,7 +38,7 @@ Signal that an error has occurred in such a way that the functions of this modul
 can detect. This must be used instead of `Base.throw` otherwise nothing will work.
 """
 function error(err)
-    while (hs = pop!(HANDLER_STACK)) != nothing
+    while (hs = peek(HANDLER_STACK)) != nothing
         for h in hs
             if err isa h.first
                 try
@@ -52,6 +52,7 @@ function error(err)
                 end
             end
         end
+        pop!(HANDLER_STACK)
     end
     throw(err)
 end
@@ -111,7 +112,11 @@ end
 function handler_bind(func, handlers...)
     a::Vector{Pair{DataType, Function}} = collect(handlers)
     push!(HANDLER_STACK, a)
-    func()
+    try
+        func()
+    finally
+        pop!(HANDLER_STACK)
+    end
 end
 
 @doc raw"""
