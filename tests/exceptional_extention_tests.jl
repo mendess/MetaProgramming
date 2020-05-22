@@ -38,7 +38,7 @@ end
     @test sentinel == 0
 end
 
-if true
+if false
     @testset "interactive" begin
         println("TEST: Pick the `return_zero`")
         @test 0 == handler_bind(DivisionByZero =>
