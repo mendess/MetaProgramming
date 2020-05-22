@@ -199,17 +199,17 @@ if false
     @testset "interactive" begin
         println("TEST: Pick the `return_zero`")
         @test 0 == handler_bind(DivisionByZero =>
-                                (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                                (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             reciprocal_restart(0)
         end
         println("TEST: Please return 4.2")
         @test 4.2 == handler_bind(DivisionByZero =>
-                     (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                     (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             reciprocal_restart(0)
         end
         println("TEST: Pick just_do_it")
         @test Inf == handler_bind(DivisionByZero =>
-                                  (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                                  (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             infinity()
         end
 
@@ -220,19 +220,19 @@ if false
         end
         println("TEST: Pick lots_params and return 1, 2, and 3")
         @test 6 == handler_bind(DivisionByZero =>
-                                (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                                (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             more_complex()
         end
         println("TEST: Pick cancel")
         @test_throws ErrorException handler_bind(DivisionByZero =>
-                                  (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                                  (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             more_complex()
         end
         @test length(Exceptional.RESTARTS_STACK) == 0
         println("TEST: Pick return_from")
         @test 0 == block() do token
             handler_bind(DivisionByZero =>
-                         (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                         (c) -> ExceptionalExtended.invoke_restart_interactive()) do
                 restart_bind(:return_from => () -> return_from(token, 0)) do
                     more_complex()
                 end
@@ -258,7 +258,7 @@ if false
     @testset "fn_types macro" begin
         println("TEST: Please return 4.2")
         @test 4.2 == handler_bind(DivisionByZero =>
-                     (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                     (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             reciprocal_restart(0)
         end
 
@@ -269,7 +269,7 @@ if false
         end
         println("TEST: Pick lots_params and return 1, 2, and 3")
         @test 6 == handler_bind(DivisionByZero =>
-                                (c) -> ExceptionalExtended.invoke_restart_mode(:interactive)) do
+                                (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             more_complex()
         end
     end

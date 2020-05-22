@@ -1,17 +1,21 @@
+@doc raw"""
+Extentions to the Exceptional module. Providing advanced features.
+"""
 module ExceptionalExtended
 
 include("Match.jl")
 using .Match
 
-export signal, invoke_restart_mode, @fn_types
+export signal, invoke_restart_interactive, @fn_types
 
 using ..Exceptional
 import ..Exceptional.invoke_restart
 import ..Exceptional.RESTARTS_STACK
 
-function signal(e)
-    Base.error(e)
-end
+@doc raw"""
+Bail out of any situation without triggering any exceptions
+"""
+signal(e) = Base.error(e)
 
 function prompt(parser, prompt_string)
     while true
@@ -28,65 +32,73 @@ function prompt(parser, prompt_string)
     end
 end
 
-function invoke_restart_mode(mode)
-    if mode == :interactive
-        println("Choose a restart:")
-        i = 0
-        count = 1
-        restarts_table = []
-        println("0: cancel :: !")
-        for restart_group in RESTARTS_STACK
-            for (key, val) in restart_group
-                if val.second != nothing
-                    println("  "^i, "$count: $key :: $(join(val.second, " -> ")) -> Any")
-                else
-                    println("  "^i, "$count: $key :: Any")
-                end
-                push!(restarts_table, key => val.second)
-                count += 1
+@doc raw"""
+Invoke an interactive restart. The user will be prompted with the available restarts
+and can pick one, and pass arguments if they where supplied upon restart declaration.
+"""
+function invoke_restart_interactive()
+    println("Choose a restart:")
+    i = 0
+    count = 1
+    restarts_table = []
+    println("0: cancel :: !")
+    for restart_group in RESTARTS_STACK
+        for (key, val) in restart_group
+            if val.second != nothing
+                println("  "^i, "$count: $key :: $(join(val.second, " -> ")) -> Any")
+            else
+                println("  "^i, "$count: $key :: Any")
             end
-            i += 1
+            push!(restarts_table, key => val.second)
+            count += 1
         end
-        restart = prompt("restart> ") do line
-            pick = try
-                parse(Int64, line)
-            catch
-                return nothing
-            end
-            @match pick begin
-                0                        => ExceptionalExtended.signal("Restart canceled")
-                1:length(restarts_table) => restarts_table[pick]
-                _                        => println("Invalid restart")
-            end
-        end
-        params = []
-        if restart.second != nothing
-            for type in restart.second
-                input = @match type begin
-                    Function => prompt("Input $type: () -> ") do line
-                        () -> eval(Meta.parse(line))
-                    end
-                    _        => prompt("Input $type: ") do line
-                        try
-                            parse(type, line)
-                        catch e
-                            println("Invalid input: '$e'")
-                        end
-                    end
-                end
-                push!(params, input)
-            end
-        end
-        invoke_restart(restart.first, params...)
-    else
-        Base.error("Invalid restart mode")
+        i += 1
     end
+    restart = prompt("restart> ") do line
+        pick = try
+            parse(Int64, line)
+        catch
+            return nothing
+        end
+        @match pick begin
+            0                        => ExceptionalExtended.signal("Restart canceled")
+            1:length(restarts_table) => restarts_table[pick]
+            _                        => println("Invalid restart")
+        end
+    end
+    params = []
+    if restart.second != nothing
+        for type in restart.second
+            input = @match type begin
+                Function => prompt("Input $type: () -> ") do line
+                    () -> eval(Meta.parse(line))
+                end
+                _        => prompt("Input $type: ") do line
+                    try
+                        parse(type, line)
+                    catch e
+                        println("Invalid input: '$e'")
+                    end
+                end
+            end
+            push!(params, input)
+        end
+    end
+    invoke_restart(restart.first, params...)
 end
 
 Base.parse(String, x) = x
 
 warning(msg) = println("\e[33mWARNING:\e[0m $msg")
 
+@doc raw"""
+Takes a lambda with typed arguments and generates a pair (lambda => (Types,...))
+
+```julia-repl
+julia> @fn_types (c::Number) -> c
+var"#3#4"() => (Number,)
+```
+"""
 macro fn_types(lambda::Expr)
     _fn_types(lambda)
 end
@@ -117,6 +129,25 @@ function _fn_types(lambda::Expr)
     end
 end
 
+@doc raw"""
+A shortcut for combining `block`, `return_from` and `handler_bind`.
+
+# Example
+Instead of writing
+```
+block() do token
+    handler_bind(Except => (c) -> return_from(escape, some_val)) do
+        some_function()
+    end
+end
+```
+One can simply write
+```
+@handler_case some_function() begin
+    c::Except = some_val
+end
+```
+"""
 macro handler_case(e_try::Expr, catches...)
     if length(catches) == 1 && catches[1].head == :block
         catches = [c for c in catches[1].args]
@@ -169,6 +200,30 @@ handler(catcher::Expr, token) = begin
     end
 end
 
+@doc raw"""
+Convinence macro to define restart cases
+Instead of writing
+```
+some_restartable(v) =
+    restart_bind(:return_zero => () -> 0,
+                 :return_value => ((c) -> c) => (Float64,),
+                 :retry_using => ((f) -> f()) => (Function,)) do
+        some_function(v)
+    end
+
+```
+One can simply write
+```
+some_restartable(v) = @restart_case reciprocal(b) begin
+    :return_zero => () -> 0
+    :return_value => (c::Float64) -> c
+    :retry_using => (f::Function) -> f()
+end
+```
+This macro will also make sure to include the types of the lambdas when they are typed
+so that `ExceptionalExtended.invoke_restart_interactive` can then ask for the parameters for
+parsing.
+"""
 macro restart_case(e_try::Expr, restarts...)
     if length(restarts) == 1 && restarts[1].head == :block
         restarts = [c for c in restarts[1].args]

@@ -1,7 +1,26 @@
+@doc raw"""
+# Match
+This module introduces pattern matching to the language using the `@match` macro.
+
+"""
 module Match
 
 export @match
 
+@doc raw"""
+
+Matches over an `item` comparing it with the patterns in `arms`
+
+## Example:
+```
+@match parse(Int, some_string) begin
+    0 => println("Got a 0")
+    1 => println("Got a 1")
+    2:6 => println("Got a number between 2 and 6")
+    _ => println("Got a negative number or a number above 6: $_")
+end
+```
+"""
 macro match(item, arms)
     val = gensym(:val)
     quote
