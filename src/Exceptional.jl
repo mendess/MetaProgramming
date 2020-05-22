@@ -39,16 +39,14 @@ can detect. This must be used instead of `Base.throw` otherwise nothing will wor
 """
 function error(err)
     while (hs = peek(HANDLER_STACK)) != nothing
-        for h in hs
-            if err isa h.first
-                try
-                    h.second(err)
-                catch e
-                    if e isa RestartResult
-                        return e.result
-                    else
-                        rethrow(e)
-                    end
+        for h in filter(h -> err isa h.first, hs)
+            try
+                h.second(err)
+            catch e
+                if e isa RestartResult
+                    return e.result
+                else
+                    rethrow(e)
                 end
             end
         end
