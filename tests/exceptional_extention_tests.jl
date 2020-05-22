@@ -17,6 +17,10 @@ reciprocal_restart(v) =
         reciprocal(0)
     end
 
+infinity() = restart_bind(:just_do_it => () -> 1 / 0) do
+    reciprocal_restart(0)
+end
+
 @testset "signal" begin
     sentinel = 0
     @test_throws ErrorException handler_bind(
@@ -34,7 +38,7 @@ reciprocal_restart(v) =
     @test sentinel == 0
 end
 
-if false
+if true
     @testset "interactive" begin
         println("TEST: Pick the `return_zero`")
         @test 0 == handler_bind(DivisionByZero =>
@@ -63,7 +67,7 @@ if false
             more_complex()
         end
         println("TEST: Pick cancel")
-        @test_throws ErrorException handler_bind(DivisionByZero =>
+        @test_throws DivisionByZero handler_bind(DivisionByZero =>
                                   (c) -> ExceptionalExtended.invoke_restart_interactive()) do
             more_complex()
         end
