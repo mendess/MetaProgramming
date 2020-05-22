@@ -18,18 +18,23 @@ struct RestartResult{T} <: Exception result::T end
 
 struct RestartNotFound <: Exception end
 
+struct ReturnFrom <: Exception
+    token
+    value
+end
+
 global COUNTER = 0
 
-global RESTARTS_STACK = Stack{Dict{Symbol,Function}}()
+global RESTARTS_STACK = Stack{Dict{Symbol, Pair{Function, Union{Nothing, Tuple}}}}()
 
 global HANDLER_STACK = Stack{Vector{Pair{DataType, Function}}}()
 
-function error(e)
+function error(err)
     while (hs = pop!(HANDLER_STACK)) != nothing
         for h in hs
-            if e isa h.first
+            if err isa h.first
                 try
-                    h.second(h.first)
+                    h.second(err)
                 catch e
                     if e isa RestartResult
                         return e.result
@@ -40,26 +45,26 @@ function error(e)
             end
         end
     end
-    throw(e)
+    throw(err)
 end
 
 function block(func)
     global COUNTER
-    flag = COUNTER
+    token = COUNTER
     COUNTER += 1
     try
-        func(flag)
+        func(token)
     catch e
-        if e.first == flag
-            e.second
+        if e isa ReturnFrom && e.token == token
+            e.value
         else
             rethrow(e)
         end
     end
 end
 
-function return_from(name, value=nothing)
-    throw(name => value);
+function return_from(token, value=nothing)
+    throw(ReturnFrom(token, value));
 end
 
 function handler_bind(func, handlers...)
@@ -69,14 +74,38 @@ function handler_bind(func, handlers...)
 end
 
 function restart_bind(restartable, restarts...)
-    push!(RESTARTS_STACK, Dict{Symbol,Function}(restarts...))
-    restartable()
+    a = Dict{Symbol, Pair{Function, Union{Nothing, Tuple}}}();
+    for r in restarts
+        try
+            # if r isa Pair{Symbol, Pair}
+            a[r.first] = r.second.first => r.second.second
+        catch e
+            if e isa ErrorException
+            # elseif r isa Pair
+                try
+                    a[r.first] = r.second => nothing
+                catch
+                    error("Error r isa $(typeof(r))")
+                end
+            else
+                rethrow(e)
+            end
+        end
+    end
+    push!(RESTARTS_STACK, a)
+    try
+        restartable()
+    finally
+        pop!(RESTARTS_STACK)
+    end
 end
 
 function invoke_restart(restart, args...)
-    while (map = pop!(RESTARTS_STACK)) != nothing
+    while (map = peek(RESTARTS_STACK)) != nothing
         if haskey(map, restart)
-            throw(RestartResult(map[restart](args...)))
+            throw(RestartResult(map[restart].first(args...)))
+        else
+            pop!(RESTARTS_STACK)
         end
     end
     throw(RestartNotFound)
