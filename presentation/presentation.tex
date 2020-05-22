@@ -83,14 +83,14 @@
 %	TITLE PAGE
 %----------------------------------------------------------------------------------------
 
-\title[Short title]{Full Title of the Talk} % The short title appears at the bottom of every slide, the full title is only on the title page
+\title[Beyond Exception Handling]{Beyond Exception Handling} % The short title appears at the bottom of every slide, the full title is only on the title page
 
-\author{John Smith} % Your name
-\institute[UCLA] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
+\author{Pedro Mendes, Ricardo Pereira} % Your name
+\institute[IST] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
 {
-University of California \\ % Your institution for the title page
+Instituto Superior Técnico \\ % Your institution for the title page
 \medskip
-\textit{john@smith.com} % Your email address
+
 }
 \date{\today} % Date, can be changed to a custom date
 
@@ -109,23 +109,33 @@ University of California \\ % Your institution for the title page
 %	PRESENTATION SLIDES
 %----------------------------------------------------------------------------------------
 
-%------------------------------------------------
-\section{First Section} % Sections can be created in order to organize your presentation into discrete blocks, all sections and subsections are automatically printed in the table of contents as an overview of the talk
-%------------------------------------------------
-
-\subsection{Subsection Example} % A subsection can be created just before a set of slides with a common theme to further break down your presentation into chunks
-
+\section{block \& return\_from}
 \begin{frame}
-\frametitle{Paragraphs of Text}
-Sed iaculis dapibus gravida. Morbi sed tortor erat, nec interdum arcu. Sed id lorem lectus. Quisque viverra augue id sem ornare non aliquam nibh tristique. Aenean in ligula nisl. Nulla sed tellus ipsum. Donec vestibulum ligula non lorem vulputate fermentum accumsan neque mollis.\\~\\
+\frametitle{Functions block \& return\_from }
 
-Sed diam enim, sagittis nec condimentum sit amet, ullamcorper sit amet libero. Aliquam vel dui orci, a porta odio. Nullam id suscipit ipsum. Aenean lobortis commodo sem, ut commodo leo gravida vitae. Pellentesque vehicula ante iaculis arcu pretium rutrum eget sit amet purus. Integer ornare nulla quis neque ultrices lobortis. Vestibulum ultrices tincidunt libero, quis commodo erat ullamcorper id.
+\begin{block}{}
+These two functions were implemented using the try-catch mechanism present in Julia
+\end{block}
+
+\begin{block}{block function}
+The block function uses a global counter to generate the "token" that will be assigned
+to the block, and then used by the return\_from function
+\end{block}
+
+\begin{block}{return\_from}
+The return\_from function throws a ReturnFrom exception containing the token
+and the return value to return in the block
+\end{block}
+
 \end{frame}
 
+%can add more frames to same section
+
 %------------------------------------------------
 
+\section{handler\_bind}
 \begin{frame}
-\frametitle{Bullet Points}
+\frametitle{handler\_bind}
 \begin{itemize}
 \item Lorem ipsum dolor sit amet, consectetur adipiscing elit
 \item Aliquam blandit faucibus nisi, sit amet dapibus enim tempus eu
@@ -137,8 +147,9 @@ Sed diam enim, sagittis nec condimentum sit amet, ullamcorper sit amet libero. A
 
 %------------------------------------------------
 
+\section{restart\_bind}
 \begin{frame}
-\frametitle{Blocks of Highlighted Text}
+\frametitle{restart\_bind}
 \begin{block}{Block 1}
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ultricies in feugiat rutrum, porttitor sit amet augue. Aliquam ut tortor mauris. Sed volutpat ante purus, quis accumsan dolor.
 \end{block}
@@ -154,8 +165,10 @@ Suspendisse tincidunt sagittis gravida. Curabitur condimentum, enim sed venenati
 
 %------------------------------------------------
 
+\section{invoke\_restart}
+
 \begin{frame}
-\frametitle{Multiple Columns}
+\frametitle{invoke\_restart}
 \begin{columns}[c] % The "c" option specifies centered vertical alignment while the "t" option is used for top vertical alignment
 
 \column{.45\textwidth} % Left column and width
@@ -173,8 +186,9 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ul
 \end{frame}
 
 %------------------------------------------------
-\section{Second Section}
-%------------------------------------------------
+
+\section{Extensions}
+\subsection{signal}
 
 \begin{frame}
 \frametitle{Table}
@@ -194,6 +208,7 @@ Treatment 3 & 0.0009271 & 0.296 \\
 
 %------------------------------------------------
 
+\subsection{interactive}
 \begin{frame}
 \frametitle{Theorem}
 \begin{theorem}[Mass--energy equivalence]
@@ -202,6 +217,8 @@ $E = mc^2$
 \end{frame}
 
 %------------------------------------------------
+
+\subsection{handler\_case}
 
 \begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
 \frametitle{Verbatim}
@@ -217,6 +234,8 @@ $E = mc^2$
 \end{frame}
 
 %------------------------------------------------
+
+\subsection{restart\_case}
 
 \begin{frame}
 \frametitle{Figure}
